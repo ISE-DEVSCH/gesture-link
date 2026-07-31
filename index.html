@@ -17,6 +17,8 @@
     video { width:100%; display:block; transform:scaleX(-1); } canvas { position:absolute; inset:0; width:100%; height:100%; transform:scaleX(-1); pointer-events:none; }
     .overlay { position:absolute; left:16px; top:16px; color:#d1fae5; background:#07120dcc; border-radius:8px; padding:8px 10px; font-size:14px; }
     .toolbar { display:flex; gap:8px; margin-top:14px; } .toolbar button { flex:1; }
+    .visual-options { display:flex; gap:18px; margin-top:10px; color:var(--muted); font-size:13px; }
+    .visual-options label { display:flex; align-items:center; gap:6px; cursor:pointer; }
     .status { margin-top:12px; color:var(--good); min-height:22px; } .hint { color:var(--muted); font-size:13px; line-height:1.55; margin-top:12px; }
     .mapping { display:grid; gap:8px; max-height:360px; overflow:auto; margin-top:12px; }
     .mapping-item { border:1px solid var(--line); border-radius:12px; padding:11px; display:grid; grid-template-columns:1fr auto; gap:5px 10px; cursor:pointer; }
@@ -39,6 +41,7 @@
     <section>
       <div class="card camera"><video id="video" autoplay muted playsinline></video><canvas id="canvas"></canvas><div id="detected" class="overlay">카메라를 시작하세요.</div></div>
       <div class="toolbar"><button id="startBtn" class="primary">카메라 시작</button><button id="stopBtn" class="secondary">중지</button></div>
+      <div class="visual-options"><label><input id="showNodes" type="checkbox" checked> 노드 표시</label><label><input id="showConnections" type="checkbox" checked> 연결선 표시</label></div>
       <p id="status" class="status">대기 중</p>
       <p class="hint">브라우저에서는 보안상 임의의 Windows 앱을 직접 실행할 수 없습니다. 유튜브·웹사이트·알림·사용자 지정 URL(예: 커스텀 프로토콜)을 연결할 수 있습니다.</p>
     </section>
@@ -81,6 +84,11 @@
     let visionApi = null;
     const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d"), status = $("status"), detected = $("detected");
     let stream, handLandmarker, poseLandmarker, animationId;
+    const showNodes = $("showNodes"), showConnections = $("showConnections");
+    showNodes.checked=localStorage.getItem("gesture-link-show-nodes")!=="false";
+    showConnections.checked=localStorage.getItem("gesture-link-show-connections")!=="false";
+    showNodes.onchange=()=>localStorage.setItem("gesture-link-show-nodes",showNodes.checked);
+    showConnections.onchange=()=>localStorage.setItem("gesture-link-show-connections",showConnections.checked);
     $("stableMsInput").value=localStorage.getItem("gesture-link-stable-ms")||250;
     $("cooldownInput").value=localStorage.getItem("gesture-link-cooldown-sec")||5;
     $("stableMsInput").onchange=()=>localStorage.setItem("gesture-link-stable-ms",Math.max(0,Number($("stableMsInput").value)||0));
@@ -160,7 +168,7 @@
       return found;
     }
     function detectBothHandsUp(hands, pose) { if((hands.landmarks||[]).length<2||!pose.landmarks?.[0])return false; const p=pose.landmarks[0]; return p[15].y<p[11].y&&p[16].y<p[12].y; }
-    function drawHands(hands, pose) { ctx.clearRect(0,0,canvas.width,canvas.height); if(!visionApi)return; const drawing=new visionApi.DrawingUtils(ctx); (hands.landmarks||[]).forEach(lm=>drawing.drawConnectors(lm,visionApi.HandLandmarker.HAND_CONNECTIONS,{color:"#38bdf8",lineWidth:3})); if(pose.landmarks?.[0]&&visionApi.PoseLandmarker)drawing.drawConnectors(pose.landmarks[0],visionApi.PoseLandmarker.POSE_CONNECTIONS,{color:"#f59e0b",lineWidth:3}); }
+    function drawHands(hands, pose) { ctx.clearRect(0,0,canvas.width,canvas.height); if(!visionApi)return; const drawing=new visionApi.DrawingUtils(ctx); (hands.landmarks||[]).forEach(lm=>{ if(showConnections.checked)drawing.drawConnectors(lm,visionApi.HandLandmarker.HAND_CONNECTIONS,{color:"#38bdf8",lineWidth:3}); if(showNodes.checked)drawing.drawLandmarks(lm,{color:"#f8fafc",fillColor:"#0ea5e9",radius:3}); }); if(pose.landmarks?.[0]&&visionApi.PoseLandmarker){ if(showConnections.checked)drawing.drawConnectors(pose.landmarks[0],visionApi.PoseLandmarker.POSE_CONNECTIONS,{color:"#f59e0b",lineWidth:3}); if(showNodes.checked)drawing.drawLandmarks(pose.landmarks[0],{color:"#fff7ed",fillColor:"#f97316",radius:3}); } }
     function chooseAction(found) { return actions.filter(a=>found.has(a.gesture)).sort((a,b)=>(Number(b.priority)||0)-(Number(a.priority)||0))[0]; }
     function evaluate(found) {
       const candidate=chooseAction(found); const requiredFrames=Math.max(1,Math.round((Number($("stableMsInput").value)||0)/33)); const cooldownMs=Math.max(0,Number($("cooldownInput").value)||0)*1000; if(!candidate){release++;if(release>=5){armed=true;stable=0;lastGesture="";}return;} release=0; if(candidate.gesture!==lastGesture){lastGesture=candidate.gesture;stable=1;return;} stable++; if(!armed||pending||stable<requiredFrames||Date.now()-lastTrigger<cooldownMs)return; armed=false;pending=true;lastTrigger=Date.now();showConfirm(candidate);
