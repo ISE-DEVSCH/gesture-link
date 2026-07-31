@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gesture Link Web</title>
+  <style>
+    :root { --bg:#f4f7fb; --panel:#fff; --ink:#172033; --muted:#667085; --primary:#2563eb; --line:#e5e7eb; --good:#087f5b; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--ink); font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; }
+    header { padding:24px 32px 12px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+    h1,h2,p { margin:0; } h1 { font-size:24px; } h2 { font-size:17px; } .sub { color:var(--muted); margin-top:5px; }
+    button, select, input { font:inherit; } button { border:0; border-radius:10px; padding:10px 14px; cursor:pointer; font-weight:650; }
+    .primary { background:var(--primary); color:white; } .secondary { background:#e9efff; color:#1d4ed8; } .danger { background:#fff0f0; color:#c92a2a; }
+    .layout { display:grid; grid-template-columns:minmax(520px,1.4fr) minmax(360px,1fr); gap:18px; padding:12px 32px 32px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; box-shadow:0 8px 24px #1720330b; padding:18px; }
+    .camera { position:relative; padding:0; overflow:hidden; background:#0c111b; min-height:420px; display:flex; align-items:center; justify-content:center; }
+    video { width:100%; display:block; transform:scaleX(-1); } canvas { position:absolute; inset:0; width:100%; height:100%; transform:scaleX(-1); pointer-events:none; }
+    .overlay { position:absolute; left:16px; top:16px; color:#d1fae5; background:#07120dcc; border-radius:8px; padding:8px 10px; font-size:14px; }
+    .toolbar { display:flex; gap:8px; margin-top:14px; } .toolbar button { flex:1; }
+    .status { margin-top:12px; color:var(--good); min-height:22px; } .hint { color:var(--muted); font-size:13px; line-height:1.55; margin-top:12px; }
+    .mapping { display:grid; gap:8px; max-height:360px; overflow:auto; margin-top:12px; }
+    .mapping-item { border:1px solid var(--line); border-radius:12px; padding:11px; display:grid; grid-template-columns:1fr auto; gap:5px 10px; cursor:pointer; }
+    .mapping-item:hover,.mapping-item.selected { border-color:#93b4ff; background:#f5f8ff; } .mapping-item small { color:var(--muted); }
+    .editor { margin-top:18px; border-top:1px solid var(--line); padding-top:16px; } .form-grid { display:grid; gap:10px; margin-top:12px; }
+    label { font-size:13px; color:#475467; display:grid; gap:5px; } input,select { width:100%; border:1px solid #d0d5dd; border-radius:9px; padding:9px 10px; background:#fff; color:var(--ink); }
+    .form-actions { display:flex; gap:8px; margin-top:12px; } .form-actions button { flex:1; }
+    .empty { color:var(--muted); padding:18px 4px; text-align:center; } .badge { font-size:12px; padding:3px 7px; border-radius:999px; background:#eef2ff; color:#4338ca; }
+    dialog { border:0; border-radius:16px; padding:0; width:min(440px,calc(100% - 32px)); box-shadow:0 25px 80px #11182755; } dialog::backdrop { background:#11182788; }
+    .dialog-inner { padding:24px; } .dialog-inner h2 { margin-bottom:10px; } .dialog-inner p { color:var(--muted); line-height:1.6; } .dialog-actions { display:flex; gap:8px; margin-top:22px; } .dialog-actions button { flex:1; }
+    @media (max-width:900px) { header { padding:18px; } .layout { grid-template-columns:1fr; padding:8px 18px 24px; } .camera { min-height:300px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>Gesture Link Web</h1><p class="sub">카메라 행동을 인식해 웹 작업을 연결합니다.</p></div>
+    <button id="presetBtn" class="secondary">기본 프리셋 추가</button>
+  </header>
+  <main class="layout">
+    <section>
+      <div class="card camera"><video id="video" autoplay muted playsinline></video><canvas id="canvas"></canvas><div id="detected" class="overlay">카메라를 시작하세요.</div></div>
+      <div class="toolbar"><button id="startBtn" class="primary">카메라 시작</button><button id="stopBtn" class="secondary">중지</button></div>
+      <p id="status" class="status">대기 중</p>
+      <p class="hint">브라우저에서는 보안상 임의의 Windows 앱을 직접 실행할 수 없습니다. 유튜브·웹사이트·알림·사용자 지정 URL(예: 커스텀 프로토콜)을 연결할 수 있습니다.</p>
+    </section>
+    <section class="card">
+      <h2>행동 연결</h2><p class="sub">동시에 여러 행동이 감지되면 우선순위가 가장 높은 하나만 선택합니다.</p>
+      <div id="mappingList" class="mapping"></div>
+      <div class="editor">
+        <h2 id="editorTitle">새 연결</h2>
+        <div class="form-grid">
+          <label>연결 이름<input id="nameInput" placeholder="예: 유튜브 재생"></label>
+          <label>감지 행동<select id="gestureInput"><option value="thumbs_up">엄지손가락 올리기</option><option value="open_hand">손바닥 펴기</option><option value="both_hands_up">양손 들기</option><option value="left_hand">왼손 인식</option><option value="right_hand">오른손 인식</option></select></label>
+          <label>실행 작업<select id="typeInput"><option value="url">URL 열기</option><option value="app">앱 열기</option></select></label>
+          <label>대상<input id="targetInput" placeholder="URL 또는 알림 문구"></label>
+          <label>우선순위<input id="priorityInput" type="number" min="0" max="999" value="50"></label>
+          <label>감지 유지 시간(ms)<input id="stableMsInput" type="number" min="0" max="3000" step="50" value="250"></label>
+          <label>재실행 대기 시간(s)<input id="cooldownInput" type="number" min="0" max="60" step="0.5" value="5"></label>
+        </div>
+        <div class="form-actions"><button id="newBtn" class="secondary">새로 만들기</button><button id="saveBtn" class="primary">연결 저장</button><button id="deleteBtn" class="danger">삭제</button></div>
+      </div>
+    </section>
+  </main>
+  <dialog id="confirmDialog"><div class="dialog-inner"><h2 id="confirmTitle">작업 실행 확인</h2><p id="confirmText"></p><div class="dialog-actions"><button id="cancelBtn" class="secondary">취소</button><button id="confirmBtn" class="primary">실행</button></div></div></dialog>
+
+  <script>
+
+    const $ = (id) => document.getElementById(id);
+    const labels = { thumbs_up:"엄지손가락 올리기", open_hand:"손바닥 펴기", both_hands_up:"양손 들기", left_hand:"왼손 인식", right_hand:"오른손 인식" };
+    const types = { url:"URL 열기", app:"앱 열기" };
+    const defaultActions = [
+      {name:"유튜브 재생",gesture:"thumbs_up",type:"url",target:"https://www.youtube.com/watch?v=dQw4w9WgXcQ",priority:50},
+      {name:"유튜브 홈",gesture:"both_hands_up",type:"url",target:"https://www.youtube.com",priority:50},
+      {name:"검색 페이지",gesture:"open_hand",type:"url",target:"https://www.google.com",priority:40}
+    ];
+    let actions;
+    try { actions = JSON.parse(localStorage.getItem("gesture-link-actions") || "null") || JSON.parse(JSON.stringify(defaultActions)); }
+    catch (_) { actions = JSON.parse(JSON.stringify(defaultActions)); localStorage.removeItem("gesture-link-actions"); }
+    const handGestures = new Set(["thumbs_up","open_hand","both_hands_up","left_hand","right_hand"]);
+    actions = Array.isArray(actions) ? actions.filter(a=>handGestures.has(a.gesture)) : JSON.parse(JSON.stringify(defaultActions));
+    let selected = -1, cameraOn = false, pending = false, lastVideoTime = -1, stable = 0, armed = true, lastGesture = "", release = 0, lastTrigger = 0;
+    let visionApi = null;
+    const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d"), status = $("status"), detected = $("detected");
+    let stream, handLandmarker, poseLandmarker, animationId;
+    $("stableMsInput").value=localStorage.getItem("gesture-link-stable-ms")||250;
+    $("cooldownInput").value=localStorage.getItem("gesture-link-cooldown-sec")||5;
+    $("stableMsInput").onchange=()=>localStorage.setItem("gesture-link-stable-ms",Math.max(0,Number($("stableMsInput").value)||0));
+    $("cooldownInput").onchange=()=>localStorage.setItem("gesture-link-cooldown-sec",Math.max(0,Number($("cooldownInput").value)||0));
+
+    function saveLocal() { localStorage.setItem("gesture-link-actions", JSON.stringify(actions)); }
+    function renderList() {
+      const list = $("mappingList"); list.innerHTML = "";
+      if (!actions.length) { list.innerHTML = '<div class="empty">아직 연결이 없습니다.</div>'; return; }
+      actions.forEach((a,i) => { const el = document.createElement("div"); el.className = "mapping-item" + (i===selected ? " selected" : ""); el.innerHTML = `<div><strong>${escapeHtml(a.name)}</strong><br><small>${labels[a.gesture]||a.gesture} → ${types[a.type]||a.type}</small></div><span class="badge">우선순위 ${a.priority ?? 50}</span>`; el.onclick=()=>selectAction(i); list.appendChild(el); });
+    }
+    function escapeHtml(s) { return String(s).replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c])); }
+    function selectAction(i) { selected=i; const a=actions[i]; $("editorTitle").textContent="연결 편집"; $("nameInput").value=a.name; $("gestureInput").value=a.gesture; $("typeInput").value=a.type; $("targetInput").value=a.target; $("priorityInput").value=a.priority ?? 50; renderList(); }
+    function clearEditor() { selected=-1; $("editorTitle").textContent="새 연결"; ["nameInput","targetInput"].forEach(id=>$(id).value=""); $("gestureInput").value="thumbs_up"; $("typeInput").value="url"; $("priorityInput").value=50; renderList(); }
+    function saveAction() { const name=$("nameInput").value.trim(), target=$("targetInput").value.trim(); if(!name||!target){alert("이름과 대상을 입력하세요.");return;} const a={name,gesture:$("gestureInput").value,type:$("typeInput").value,target,priority:Number($("priorityInput").value)||0}; if(selected<0) actions.push(a); else actions[selected]=a; saveLocal(); renderList(); status.textContent="연결을 저장했습니다."; }
+    function addPresets() { const names=new Set(actions.map(a=>a.name)); const added=defaultActions.filter(a=>!names.has(a.name)); actions.push(...JSON.parse(JSON.stringify(added))); saveLocal(); renderList(); status.textContent=`기본 프리셋 ${added.length}개를 추가했습니다.`; }
+    function deleteAction() { if(selected<0)return; if(confirm("선택한 연결을 삭제할까요?")){actions.splice(selected,1);saveLocal();clearEditor();} }
+    $("saveBtn").onclick=saveAction; $("newBtn").onclick=clearEditor; $("deleteBtn").onclick=deleteAction; $("presetBtn").onclick=addPresets; renderList();
+
+    // 작업 유형을 URL 열기/앱 열기로 통합하고, 이전 버전의 알림 작업은 제거합니다.
+    actions = actions.filter(a=>a.type!=="notification");
+    actions.forEach(a=>{ if(a.type==="youtube"||a.type==="custom")a.type="url"; });
+    defaultActions.forEach(a=>{ if(a.type==="youtube"||a.type==="custom")a.type="url"; });
+    types.url="URL 열기"; types.app="앱 열기";
+    const typeInput = $("typeInput");
+    typeInput.innerHTML='<option value="url">URL 열기</option><option value="app">앱 열기</option>';
+    $("targetInput").placeholder="https://... 또는 spotify://, steam:// 같은 앱 프로토콜";
+    $("newBtn").onclick=()=>{ selected=-1; $("editorTitle").textContent="새 연결"; $("nameInput").value=""; $("targetInput").value=""; $("gestureInput").value="thumbs_up"; typeInput.value="url"; $("priorityInput").value=50; renderList(); };
+    saveLocal(); renderList();
+
+    async function loadModels() {
+      status.textContent="MediaPipe 모델을 불러오는 중...";
+      let importError;
+      for(const source of [
+        "./web_deps/vision_bundle.mjs",
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/vision_bundle.mjs",
+        "https://unpkg.com/@mediapipe/tasks-vision@0.10.22/vision_bundle.mjs",
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/vision_bundle.js"
+      ]) {
+        try { visionApi=await import(source); break; } catch(e) { importError=e; }
+      }
+      if(!visionApi) throw new Error("MediaPipe 라이브러리를 내려받지 못했습니다. CDN 연결을 확인하세요. "+(importError?.message||""));
+      let vision, wasmError;
+      for(const wasm of [
+        "./web_deps",
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm",
+        "https://unpkg.com/@mediapipe/tasks-vision@0.10.22/wasm"
+      ]) {
+        try { vision=await visionApi.FilesetResolver.forVisionTasks(wasm); break; } catch(e) { wasmError=e; }
+      }
+      if(!vision) throw new Error("MediaPipe WASM 파일을 내려받지 못했습니다. "+(wasmError?.message||""));
+      const handModel="./web_deps/hand_landmarker.task";
+      const poseModel="./web_deps/pose_landmarker_lite.task";
+      async function createWithFallback(Class, options) {
+        try { return await Class.createFromOptions(vision, {...options, baseOptions:{...options.baseOptions,delegate:"GPU"}}); }
+        catch (_) { return await Class.createFromOptions(vision, {...options, baseOptions:{...options.baseOptions,delegate:"CPU"}}); }
+      }
+      // 손 모델은 필수입니다. GPU가 안 되면 CPU로 재시도합니다.
+      handLandmarker = await createWithFallback(visionApi.HandLandmarker,{baseOptions:{modelAssetPath:handModel},runningMode:"VIDEO",numHands:2});
+      if(visionApi.PoseLandmarker) poseLandmarker = await createWithFallback(visionApi.PoseLandmarker,{baseOptions:{modelAssetPath:poseModel},runningMode:"VIDEO",numPoses:1});
+    }
+    function detectHands(result) {
+      const found=new Set(), hands=result.landmarks||[];
+      hands.forEach((lm,handIndex)=>{
+        const fingers=[8,12,16,20].filter(i=>lm[i].y<lm[i-2].y).length;
+        const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+        const palmSize=distance(lm[0],lm[9]);
+        const thumbLength=distance(lm[2],lm[4]);
+        const thumbRise=(lm[2].y-lm[4].y)/Math.max(thumbLength,0.0001);
+        // 엄지 끝이 실제로 위를 향하고, 손바닥 크기에 비해 충분히 펴진 경우만 인식합니다.
+        if(fingers<=1&&thumbLength>palmSize*0.38&&thumbRise>0.28&&lm[4].y<lm[5].y)found.add("thumbs_up");
+        if(fingers>=3)found.add("open_hand");
+        const handedness=result.handednesses?.[handIndex]?.[0]?.categoryName?.toLowerCase();
+        if(handedness==="left")found.add("left_hand");
+        if(handedness==="right")found.add("right_hand");
+      });
+      return found;
+    }
+    function detectBothHandsUp(hands, pose) { if((hands.landmarks||[]).length<2||!pose.landmarks?.[0])return false; const p=pose.landmarks[0]; return p[15].y<p[11].y&&p[16].y<p[12].y; }
+    function drawHands(hands, pose) { ctx.clearRect(0,0,canvas.width,canvas.height); if(!visionApi)return; const drawing=new visionApi.DrawingUtils(ctx); (hands.landmarks||[]).forEach(lm=>drawing.drawConnectors(lm,visionApi.HandLandmarker.HAND_CONNECTIONS,{color:"#38bdf8",lineWidth:3})); if(pose.landmarks?.[0]&&visionApi.PoseLandmarker)drawing.drawConnectors(pose.landmarks[0],visionApi.PoseLandmarker.POSE_CONNECTIONS,{color:"#f59e0b",lineWidth:3}); }
+    function chooseAction(found) { return actions.filter(a=>found.has(a.gesture)).sort((a,b)=>(Number(b.priority)||0)-(Number(a.priority)||0))[0]; }
+    function evaluate(found) {
+      const candidate=chooseAction(found); const requiredFrames=Math.max(1,Math.round((Number($("stableMsInput").value)||0)/33)); const cooldownMs=Math.max(0,Number($("cooldownInput").value)||0)*1000; if(!candidate){release++;if(release>=5){armed=true;stable=0;lastGesture="";}return;} release=0; if(candidate.gesture!==lastGesture){lastGesture=candidate.gesture;stable=1;return;} stable++; if(!armed||pending||stable<requiredFrames||Date.now()-lastTrigger<cooldownMs)return; armed=false;pending=true;lastTrigger=Date.now();showConfirm(candidate);
+    }
+    function showConfirm(action) { $("confirmText").textContent=`${labels[action.gesture]} 행동을 인식했습니다. “${types[action.type]}” 작업을 실행할까요?`; $("confirmDialog").showModal(); $("confirmBtn").onclick=()=>{ $("confirmDialog").close(); pending=false;execute(action); }; $("cancelBtn").onclick=()=>{ $("confirmDialog").close(); pending=false; status.textContent="작업을 취소했습니다. 행동을 잠시 멈추면 다시 감지됩니다."; }; }
+    function execute(a) { if(a.type==="app"){ if(!/^[a-z][a-z0-9+.-]*:/i.test(a.target))throw new Error("앱 열기는 spotify://, steam:// 같은 앱 프로토콜을 사용하세요."); window.location.href=a.target; return; } window.open(a.target,"_blank","noopener"); status.textContent=`실행 완료: ${a.name}`; }
+    async function loop() { if(!cameraOn)return; if(video.readyState>=2&&video.currentTime!==lastVideoTime&&handLandmarker){lastVideoTime=video.currentTime; canvas.width=video.videoWidth;canvas.height=video.videoHeight; const now=performance.now(); const hands=handLandmarker.detectForVideo(video,now); drawHands(hands); const found=detectHands(hands); detected.textContent=found.size?[...found].map(x=>labels[x]).join(" · "):"감지된 행동 없음"; evaluate(found); } animationId=requestAnimationFrame(loop); }
+    // 최신 loop: 손 랜드마크와 Pose 랜드마크를 함께 사용해 양손이 실제로 어깨보다 위인지 확인합니다.
+    async function loop() { if(!cameraOn)return; if(video.readyState>=2&&video.currentTime!==lastVideoTime&&handLandmarker){lastVideoTime=video.currentTime; canvas.width=video.videoWidth; canvas.height=video.videoHeight; const now=performance.now(); const hands=handLandmarker.detectForVideo(video,now); const pose=poseLandmarker?poseLandmarker.detectForVideo(video,now):{landmarks:[]}; drawHands(hands,pose); const found=detectHands(hands); if(detectBothHandsUp(hands,pose))found.add("both_hands_up"); detected.textContent=found.size?[...found].map(x=>labels[x]).join(" · "):"감지된 행동 없음"; evaluate(found); } animationId=requestAnimationFrame(loop); }
+    execute = function(a) { if(a.type==="app"){ if(!/^[a-z][a-z0-9+.-]*:/i.test(a.target))throw new Error("앱 열기는 spotify://, steam:// 같은 앱 프로토콜을 사용하세요."); window.location.href=a.target; status.textContent=`앱 열기 요청: ${a.name}`; return; } window.open(a.target,"_blank","noopener"); status.textContent=`실행 완료: ${a.name}`; };
+    $("startBtn").onclick=async()=>{try{
+      const secureHost=location.hostname==="localhost"||location.hostname==="127.0.0.1"||location.hostname==="[::1]";
+      if(!window.isSecureContext&&!secureHost)throw new Error("카메라는 HTTPS 또는 localhost에서만 사용할 수 있습니다. 먼저 python -m http.server 8000으로 실행하세요.");
+      if(!navigator.mediaDevices?.getUserMedia)throw new Error("이 브라우저에서 카메라 API를 사용할 수 없습니다.");
+      stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:"user"},audio:false});
+      video.srcObject=stream;
+      await new Promise(resolve=>{video.onloadedmetadata=resolve;});
+      await video.play(); cameraOn=true; status.textContent="카메라가 켜졌습니다. 손·팔 모델을 불러오는 중..."; loop();
+      await loadModels();
+      status.textContent="손 인식 중...";
+    }catch(e){status.textContent=cameraOn?"카메라는 켜졌지만 손 모델을 불러오지 못했습니다.":"카메라를 시작하지 못했습니다.";alert((cameraOn?"카메라는 켜졌지만 손 인식을 시작하지 못했습니다.":"카메라를 시작하지 못했습니다.")+"\n\n"+e.message);}};
+    $("stopBtn").onclick=()=>{cameraOn=false;cancelAnimationFrame(animationId);stream?.getTracks().forEach(t=>t.stop());video.srcObject=null;ctx.clearRect(0,0,canvas.width,canvas.height);detected.textContent="카메라를 시작하세요.";status.textContent="중지됨";};
+  </script>
+</body>
+</html>

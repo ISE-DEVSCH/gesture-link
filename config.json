@@ -1,0 +1,44 @@
+{
+  "cooldown_seconds": 5,
+  "stable_frames": 4,
+  "release_frames": 5,
+  "stable_frames_by_gesture": {
+    "smile": 4,
+    "wink": 4,
+    "mouth_open": 4,
+    "brow_raise": 4,
+    "thumbs_up": 3,
+    "open_hand": 3,
+    "both_hands_up": 3
+  },
+  "actions": [
+    {
+      "name": "유튜브 재생",
+      "gesture": "thumbs_up",
+      "type": "youtube",
+      "target": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "priority": 50
+    },
+    {
+      "name": "유튜브 홈 열기",
+      "gesture": "both_hands_up",
+      "type": "url",
+      "target": "https://www.youtube.com",
+      "priority": 50
+    },
+    {
+      "name": "메모장 열기",
+      "gesture": "open_hand",
+      "type": "app",
+      "target": "notepad.exe",
+      "priority": 50
+    },
+    {
+      "name": "문서 폴더 열기",
+      "gesture": "wink",
+      "type": "file",
+      "target": "%USERPROFILE%\\Documents",
+      "priority": 50
+    }
+  ]
+}
